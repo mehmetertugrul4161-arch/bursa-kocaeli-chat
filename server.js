@@ -1,40 +1,53 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-app.use(express.static(path.join(__dirname, 'public')));
+// Statik dosyaları sunmak için (Eğer index.html ana dizindeyse burası yeterlidir)
+app.use(express.static(__dirname));
 
-// Statik dosyaları sunmak için public klasörünü açıyoruz
-app.use(express.static('public'));
+// Ana sayfa isteği (GET /) için index.html dosyasını gönder
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
 
+// Socket.io bağlantı yönetimi
 io.on('connection', (socket) => {
-    console.log('Bir kullanıcı bağlandı:', socket.id);
+    console.log('Bir kullanıcı bağlandı: ' + socket.id);
 
-    socket.on('signal', (data) => {
-        socket.broadcast.emit('signal', data);
+    // Gelen sohbet mesajını diğer kullanıcılara ilet
+    socket.on('chat-message', (msg) => {
+        // Gönderen kişinin ID'sini veya adını ekleyerek karşı tarafa yollayalım
+        socket.broadcast.emit('chat-message', {
+            sender: 'Kuzen',
+            message: msg
+        });
     });
 
-    socket.on('chat-message', (msg) => {
-        socket.broadcast.emit('chat-message', msg);
+    // WebRTC Sinyalleşme olayları (Görüntülü arama için)
+    socket.on('offer', (offer) => {
+        socket.broadcast.emit('offer', offer);
+    });
+
+    socket.on('answer', (answer) => {
+        socket.broadcast.emit('answer', answer);
+    });
+
+    socket.on('ice-candidate', (candidate) => {
+        socket.broadcast.emit('ice-candidate', candidate);
     });
 
     socket.on('disconnect', () => {
-        console.log('Kullanıcı ayrıldı:', socket.id);
+        console.log('Kullanıcı ayrıldı: ' + socket.id);
     });
 });
 
+// Render'ın vereceği port veya yerel test için 3000
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor...`);
-});
-
-const path = require('path');
-
-// Ana sayfaya (GET /) gelen istekler için index.html dosyasını gönder
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
 });
