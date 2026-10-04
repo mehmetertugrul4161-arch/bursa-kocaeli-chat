@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bursa - Kocaeli İletişim</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background: #f4f4f9; margin: 0; padding: 20px; }
+        video { width: 45%; max-width: 400px; border: 2px solid #ccc; border-radius: 8px; margin: 10px; background: #000; }
+        #chat-box { width: 80%; max-width: 600px; height: 150px; border: 1px solid #ccc; margin: 20px auto; overflow-y: scroll; background: #fff; padding: 10px; text-align: left; border-radius: 5px; }
+        input { width: 60%; padding: 10px; font-size: 16px; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <h2>Bursa & Kocaeli Görüntülü Arama & Sohbet</h2>
+    
+    <div>
+        <video id="localVideo" autoplay playsinline muted></video>
+        <video id="remoteVideo" autoplay playsinline></video>
+    </div>
+
+    <div>
+        <button id="startBtn">Aramayı Başlat / Bağlan</button>
+    </div>
+
+    <div id="chat-box"></div>
+    <div>
+        <input type="text" id="messageInput" placeholder="Mesaj yazın...">
+        <button id="sendBtn">Gönder</button>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let localStream;
+        let peerConnection;
+
+        const servers = {
+            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        };
+
+        const localVideo = document.getElementById('localVideo');
+        const remoteVideo = document.getElementById('remoteVideo');
+        const chatBox = document.getElementById('chat-box');
+        const messageInput = document.getElementById('messageInput');
+
+        async function initMedia() {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                localVideo.srcObject = localStream;
+            } catch (error) {
+                console.error("Kamera erişim hatası:", error);
+            }
+        }
+
+        initMedia();
+
+        document.getElementById('startBtn').onclick = async () => {
+            peerConnection = new RTCPeerConnection(servers);
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+            peerConnection.ontrack = event => {
+                remoteVideo.srcObject = event.streams[0];
+            };
+
+            peerConnection.onicecandidate = event => {
+                if (event.candidate) {
+                    socket.emit('signal', { candidate: event.candidate });
+                }
+            };
+
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            socket.emit('signal', { offer: peerConnection.localDescription });
+            alert("Arama başlatıldı!");
+        };
+
+        socket.on('signal', async data => {
+            if (!peerConnection) {
+                peerConnection = new RTCPeerConnection(servers);
+                localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+                peerConnection.ontrack = event => {
+                    remoteVideo.srcObject = event.streams[0];
+                };
+
+                peerConnection.onicecandidate = event => {
+                    if (event.candidate) {
+                        socket.emit('signal', { candidate: event.candidate });
+                    }
+                };
+            }
+
+            if (data.offer) {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                socket.emit('signal', { answer: peerConnection.localDescription });
+            } else if (data.answer) {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+            } else if (data.candidate) {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+            }
+        });
+
+        document.getElementById('sendBtn').onclick = () => {
+            const msg = messageInput.value;
+            if (msg) {
+                socket.emit('chat-message', msg);
+                chatBox.innerHTML += `<p><b>Ben:</b> ${msg}</p>`;
+                messageInput.value = '';
+            }
+        };
+
+        socket.on('chat-message', msg => {
+            chatBox.innerHTML += `<p><b>Kuzen:</b> ${msg}</p>`;
+        });
+    </script>
+</body>
+</html>
