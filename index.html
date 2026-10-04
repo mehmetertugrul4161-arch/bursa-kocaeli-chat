@@ -3,119 +3,257 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bursa - Kocaeli İletişim</title>
+    <title>Bursa-Kocaeli Görüntülü ve Mesajlaşma</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; background: #f4f4f9; margin: 0; padding: 20px; }
-        video { width: 45%; max-width: 400px; border: 2px solid #ccc; border-radius: 8px; margin: 10px; background: #000; }
-        #chat-box { width: 80%; max-width: 600px; height: 150px; border: 1px solid #ccc; margin: 20px auto; overflow-y: scroll; background: #fff; padding: 10px; text-align: left; border-radius: 5px; }
-        input { width: 60%; padding: 10px; font-size: 16px; }
-        button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+        :root {
+            --bg-color: #121212;
+            --surface-color: #1e1e1e;
+            --primary-color: #1a73e8;
+            --primary-hover: #1557b0;
+            --text-color: #e8eaed;
+            --text-secondary: #9aa0a6;
+            --border-color: #3c4043;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Sol Taraf: Video Alanı */
+        .video-container {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: #000;
+            position: relative;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        .videos-grid {
+            display: flex;
+            gap: 20px;
+            width: 100%;
+            max-width: 900px;
+            justify-content: center;
+        }
+
+        video {
+            width: 100%;
+            max-width: 420px;
+            height: 300px;
+            object-fit: cover;
+            background-color: var(--surface-color);
+            border-radius: 12px;
+            border: 2px solid var(--border-color);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+
+        /* Sağ Taraf: Sohbet Alanı */
+        .chat-container {
+            flex: 1;
+            background-color: var(--surface-color);
+            border-left: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            max-width: 400px;
+        }
+
+        .chat-header {
+            padding: 20px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border-bottom: 1px solid var(--border-color);
+            background-color: #252525;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .message {
+            background-color: #2c2c2c;
+            padding: 10px 14px;
+            border-radius: 8px;
+            max-width: 80%;
+            word-break: break-word;
+            font-size: 0.95rem;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+        }
+
+        .message.self {
+            background-color: var(--primary-color);
+            align-self: flex-end;
+        }
+
+        .chat-input-area {
+            padding: 15px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 10px;
+            background-color: #252525;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background-color: #121212;
+            color: var(--text-color);
+            font-size: 0.95rem;
+            outline: none;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--primary-color);
+        }
+
+        button.send-btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button.send-btn:hover {
+            background-color: var(--primary-hover);
+        }
     </style>
 </head>
 <body>
 
-    <h2>Bursa & Kocaeli Görüntülü Arama & Sohbet</h2>
-    
-    <div>
-        <video id="localVideo" autoplay playsinline muted></video>
-        <video id="remoteVideo" autoplay playsinline></video>
+    <!-- Görüntülü Görüşme Alanı -->
+    <div class="video-container">
+        <div class="videos-grid">
+            <div>
+                <p style="margin: 0 0 5px 5px; font-size: 0.85rem; color: var(--text-secondary);">Siz</p>
+                <video id="localVideo" autoplay muted playsinline></video>
+            </div>
+            <div>
+                <p style="margin: 0 0 5px 5px; font-size: 0.85rem; color: var(--text-secondary);">Karşı Taraf</p>
+                <video id="remoteVideo" autoplay playsinline></video>
+            </div>
+        </div>
     </div>
 
-    <div>
-        <button id="startBtn">Aramayı Başlat / Bağlan</button>
+    <!-- Mesajlaşma Paneli -->
+    <div class="chat-container">
+        <div class="chat-header">
+            <span>Sohbet Odası</span>
+            <span id="notifStatus" style="font-size: 0.75rem; color: #8ab4f8; cursor: pointer;" onclick="bildirimIzinIste()">🔔 Bildirimler</span>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+            <!-- Mesajlar buraya düşecek -->
+        </div>
+        <div class="chat-input-area">
+            <input type="text" id="messageInput" placeholder="Mesajınızı yazın..." onkeypress="handleKeyPress(event)">
+            <button class="send-btn" onclick="mesajGonder()">Gönder</button>
+        </div>
     </div>
 
-    <div id="chat-box"></div>
-    <div>
-        <input type="text" id="messageInput" placeholder="Mesaj yazın...">
-        <button id="sendBtn">Gönder</button>
-    </div>
-
+    <!-- Socket.io ve Uygulama Mantığı -->
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        let localStream;
-        let peerConnection;
 
-        const servers = {
-            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-        };
-
-        const localVideo = document.getElementById('localVideo');
-        const remoteVideo = document.getElementById('remoteVideo');
-        const chatBox = document.getElementById('chat-box');
-        const messageInput = document.getElementById('messageInput');
-
-        async function initMedia() {
-            try {
-                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                localVideo.srcObject = localStream;
-            } catch (error) {
-                console.error("Kamera erişim hatası:", error);
-            }
-        }
-
-        initMedia();
-
-        document.getElementById('startBtn').onclick = async () => {
-            peerConnection = new RTCPeerConnection(servers);
-            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-            peerConnection.ontrack = event => {
-                remoteVideo.srcObject = event.streams[0];
-            };
-
-            peerConnection.onicecandidate = event => {
-                if (event.candidate) {
-                    socket.emit('signal', { candidate: event.candidate });
+        // Sayfa açıldığında tarayıcı bildirim izni iste
+        document.addEventListener("DOMContentLoaded", () => {
+            if ("Notification" in window) {
+                if (Notification.permission === "default") {
+                    Notification.requestPermission().then(permission => {
+                        if (permission === "granted") {
+                            document.getElementById("notifStatus").innerText = "🔔 Aktif";
+                        }
+                    });
+                } else if (Notification.permission === "granted") {
+                    document.getElementById("notifStatus").innerText = "🔔 Aktif";
                 }
-            };
-
-            const offer = await peerConnection.createOffer();
-            await peerConnection.setLocalDescription(offer);
-            socket.emit('signal', { offer: peerConnection.localDescription });
-            alert("Arama başlatıldı!");
-        };
-
-        socket.on('signal', async data => {
-            if (!peerConnection) {
-                peerConnection = new RTCPeerConnection(servers);
-                localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-                peerConnection.ontrack = event => {
-                    remoteVideo.srcObject = event.streams[0];
-                };
-
-                peerConnection.onicecandidate = event => {
-                    if (event.candidate) {
-                        socket.emit('signal', { candidate: event.candidate });
-                    }
-                };
-            }
-
-            if (data.offer) {
-                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
-                const answer = await peerConnection.createAnswer();
-                await peerConnection.setLocalDescription(answer);
-                socket.emit('signal', { answer: peerConnection.localDescription });
-            } else if (data.answer) {
-                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-            } else if (data.candidate) {
-                await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
             }
         });
 
-        document.getElementById('sendBtn').onclick = () => {
-            const msg = messageInput.value;
-            if (msg) {
-                socket.emit('chat-message', msg);
-                chatBox.innerHTML += `<p><b>Ben:</b> ${msg}</p>`;
-                messageInput.value = '';
+        function bildirimIzinIste() {
+            if ("Notification" in window) {
+                Notification.requestPermission().then(permission => {
+                    if (permission === "granted") {
+                        alert("Bildirim izni başarıyla verildi!");
+                        document.getElementById("notifStatus").innerText = "🔔 Aktif";
+                    }
+                });
             }
-        };
+        }
 
-        socket.on('chat-message', msg => {
-            chatBox.innerHTML += `<p><b>Kuzen:</b> ${msg}</p>`;
+        // Bildirim Gösterme Fonksiyonu
+        function bildirimGoster(baslik, icerik) {
+            if (Notification.permission === "granted") {
+                // Eğer sekme arka planda ise veya bildirim isteniyorsa tetikle
+                new Notification(baslik, {
+                    body: icerik,
+                    icon: "https://cdn-icons-png.flaticon.com/512/733/733585.png"
+                });
+            }
+        }
+
+        // Mesaj Gönderme Butonu ve Fonksiyonu
+        function mesajGonder() {
+            const input = document.getElementById("messageInput");
+            const text = input.value.trim();
+            if (text !== "") {
+                // Kendi ekranımıza ekleyelim (Geçici test amaçlı)
+                mesajEkranaEkle("Siz", text, true);
+                
+                // Sunucuya socket ile gönder (Socket olay adınızı projenize göre ayarlayabilirsiniz)
+                socket.emit("chat-message", text);
+
+                input.value = "";
+            }
+        }
+
+        function handleKeyPress(e) {
+            if (e.key === 'Enter') {
+                mesajGonder();
+            }
+        }
+
+        function mesajEkranaEkle(gonderen, mesaj, isSelf = false) {
+            const container = document.getElementById("chatMessages");
+            const div = document.createElement("div");
+            div.className = "message" + (isSelf ? " self" : "");
+            div.innerText = (isSelf ? "" : gonderen + ": ") + mesaj;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // Sunucudan gelen mesajları dinleme (Örnek socket event)
+        socket.on("chat-message", (data) => {
+            const gonderenAdi = data.sender || "Kuzen";
+            const mesajMetni = data.message || data;
+            
+            mesajEkranaEkle(gonderenAdi, mesajMetni, false);
+            
+            // Tarayıcı arka planda veya kapalıysa bildirim fırlat
+            bildirimGoster("Yeni Mesaj: " + gonderenAdi, mesajMetni);
         });
     </script>
 </body>
