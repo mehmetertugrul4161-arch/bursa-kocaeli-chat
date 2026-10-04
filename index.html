@@ -173,12 +173,92 @@
         </div>
     </div>
 
-    <!-- Socket.io ve Uygulama Mantığı -->
+    <!-- Socket.io ve WebRTC Uygulama Mantığı -->
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
 
-        // Sayfa açıldığında tarayıcı bildirim izni iste
+        // WebRTC Yapılandırması (STUN sunucuları ile ağ geçişi)
+        const iceServers = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+            ]
+        };
+
+        let localStream;
+        let remoteStream;
+        let peerConnection;
+
+        const localVideo = document.getElementById('localVideo');
+        const remoteVideo = document.getElementById('remoteVideo');
+
+        // Sayfa açıldığında Kamera ve Mikrofonu Başlat
+        async function startCamera() {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                localVideo.srcObject = localStream;
+                
+                initPeerConnection();
+            } catch (error) {
+                console.error("Kamera veya mikrofona erişilemedi:", error);
+                alert("Kamera ve mikrofon izni vermeniz gerekiyor!");
+            }
+        }
+
+        function initPeerConnection() {
+            peerConnection = new RTCPeerConnection(iceServers);
+
+            localStream.getTracks().forEach(track => {
+                peerConnection.addTrack(track, localStream);
+            });
+
+            peerConnection.ontrack = (event) => {
+                if (!remoteStream) {
+                    remoteStream = new MediaStream();
+                    remoteVideo.srcObject = remoteStream;
+                }
+                remoteStream.addTrack(event.track);
+            };
+
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    socket.emit('ice-candidate', event.candidate);
+                }
+            };
+        }
+
+        // --- WebRTC Sinyalleşme Olayları ---
+        socket.on('offer', async (offer) => {
+            if (!peerConnection) initPeerConnection();
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            socket.emit('answer', answer);
+        });
+
+        socket.on('answer', async (answer) => {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+        });
+
+        socket.on('ice-candidate', async (candidate) => {
+            if (peerConnection) {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+            }
+        });
+
+        socket.on('connect', async () => {
+            await startCamera();
+            setTimeout(async () => {
+                if (peerConnection) {
+                    const offer = await peerConnection.createOffer();
+                    await peerConnection.setLocalDescription(offer);
+                    socket.emit('offer', offer);
+                }
+            }, 2000);
+        });
+
+        // --- Bildirim ve Mesajlaşma Kodları ---
         document.addEventListener("DOMContentLoaded", () => {
             if ("Notification" in window) {
                 if (Notification.permission === "default") {
@@ -204,10 +284,8 @@
             }
         }
 
-        // Bildirim Gösterme Fonksiyonu
         function bildirimGoster(baslik, icerik) {
             if (Notification.permission === "granted") {
-                // Eğer sekme arka planda ise veya bildirim isteniyorsa tetikle
                 new Notification(baslik, {
                     body: icerik,
                     icon: "https://cdn-icons-png.flaticon.com/512/733/733585.png"
@@ -215,17 +293,12 @@
             }
         }
 
-        // Mesaj Gönderme Butonu ve Fonksiyonu
         function mesajGonder() {
             const input = document.getElementById("messageInput");
             const text = input.value.trim();
             if (text !== "") {
-                // Kendi ekranımıza ekleyelim (Geçici test amaçlı)
                 mesajEkranaEkle("Siz", text, true);
-                
-                // Sunucuya socket ile gönder (Socket olay adınızı projenize göre ayarlayabilirsiniz)
                 socket.emit("chat-message", text);
-
                 input.value = "";
             }
         }
@@ -245,14 +318,11 @@
             container.scrollTop = container.scrollHeight;
         }
 
-        // Sunucudan gelen mesajları dinleme (Örnek socket event)
         socket.on("chat-message", (data) => {
             const gonderenAdi = data.sender || "Kuzen";
             const mesajMetni = data.message || data;
             
             mesajEkranaEkle(gonderenAdi, mesajMetni, false);
-            
-            // Tarayıcı arka planda veya kapalıysa bildirim fırlat
             bildirimGoster("Yeni Mesaj: " + gonderenAdi, mesajMetni);
         });
     </script>
